@@ -1,0 +1,38 @@
+#!/bin/dash
+
+# argument checking? 
+
+curr_dir=`pwd`
+
+# check arguments
+commit=`echo $1 | cut -d':' -f1`
+file=`echo $1 | cut -d':' -f2`
+if test -z $commit
+then
+    show_path="$curr_dir/.shrug/index"
+    error=index
+else
+    show_path="$curr_dir/.shrug/.snapshot.$commit"
+    error="commit $commit"
+fi
+
+# commit number doesnt exist
+if test ! -d $show_path
+then
+    echo "shrug-show: error: unknown commit '$commit'"
+    exit 1
+fi
+
+# otherwise, cat file if it exists
+if test -f "$show_path/$file"
+then
+    cat "$show_path/$file"
+else
+    echo "shrug-show: error: '$file' not found in $error"
+    exit 1
+fi
+
+exit 0
+
+
+

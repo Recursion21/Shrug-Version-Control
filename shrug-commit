@@ -1,0 +1,78 @@
+#!/bin/dash
+
+
+if test "$#" -eq 2 || test "$#" -eq 3
+then
+
+    curr_dir=`pwd`
+    index="$curr_dir/.shrug/index"
+    message=$2
+
+    # if with [-a]
+    if test "$#" -eq 3
+    then
+        message=$3
+        for file in `find $index -type f`
+        do
+            file=`basename $file`
+            curr_filepath="$curr_dir/$file"
+            if test -e "$curr_filepath"
+            then
+                cp -- "$curr_filepath" "$index"
+            fi
+        done
+    fi
+
+    i=0
+    first_commit=0
+    # get last snapshot number
+    last_line=`tail -1 "$curr_dir/.shrug/log"`
+    last_commit=`echo $last_line | head -c 1` 
+    last_commit_dir="$curr_dir/.shrug/.snapshot.$last_commit"
+
+    # if first commit, then flag to not diff
+    if test -z "$last_commit"
+    then 
+        first_commit=1
+    fi
+
+    # check if any difference between last commit and current directory
+    if test $first_commit -eq 0 && diff -r $index $last_commit_dir > /dev/null
+    then
+        echo "nothing to commit"
+        exit 0
+    fi
+
+    # create commit directory
+    while true
+    do
+        commit_dir="$curr_dir/.shrug/.snapshot.$i"
+        if test ! -d $commit_dir
+        then
+            mkdir $commit_dir
+            echo "Committed as commit $i"
+            break
+        fi
+        i=$((i+1))
+    done 
+
+    # move files from index to commit directory
+    for file in `find $index -type f`
+    do  
+        # dont need to check if file is directory
+        cp -- $file "$commit_dir"
+    done
+
+    # add commit to log
+    #echo "$i $2" | cat - "$curr_dir/.shrug/log" | tee "$curr_dir/.shrug/log" > /dev/null
+    echo "$i $message" >> "$curr_dir/.shrug/log"
+
+else
+    echo "usage: shrug-commit [-a] -m commit-message"
+    exit 1
+fi
+
+
+     
+
+

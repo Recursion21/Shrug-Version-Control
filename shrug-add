@@ -1,0 +1,33 @@
+#!/bin/dash
+
+curr_dir=`pwd`
+    
+for file in "$@"
+do 
+    # check if .shrug exists
+    if test ! -d .shrug
+    then
+        echo shrug-add: error: no .shrug directory containing shrug repository exists
+        exit 1
+    fi
+
+    # check if $file exists as a file
+    index="$curr_dir/.shrug/index"
+    if test ! -f "$file"
+    then
+        # delete file from index if it exists but is removed from pwd
+        index_file="$index/$file"
+        if test -f $index_file
+        then
+            rm "$index_file"
+            exit 0
+        else
+            echo "shrug-add: error: can not open '$file'"
+            exit 1
+        fi
+    fi
+    cp -- "$file" "$index/$file"
+done
+
+exit 0
+    

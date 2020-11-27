@@ -1,0 +1,102 @@
+#!/bin/dash
+
+curr_dir=`pwd`
+index="$curr_dir/.shrug/index"
+last_line=`tail -1 "$curr_dir/.shrug/log"`
+last_commit=`echo $last_line | head -c 1` 
+last_commit_dir="$curr_dir/.shrug/.snapshot.$last_commit"
+
+# status_file, which gets sorted and printed after done processing
+status_file="$curr_dir/.shrug/shrug_status"
+status_visited="$curr_dir/.shrug/shrug_visited" # tracks files processed so no repeats
+
+rm -- $status_file 2>/dev/null
+touch $status_file
+rm -- $status_visited 2>/dev/null
+touch $status_visited
+
+# most processing at index, because most situations involve files existing in index
+for file in `find $index -type f`
+do
+    basefile=`basename $file`
+    curr_file="$curr_dir/$basefile"
+    last_comm_file="$last_commit_dir/$basefile"
+
+    if test -f $file && test ! -f $curr_file && test ! -f $last_comm_file
+    then
+        echo "$basefile - added to index, file deleted" >> $status_file
+    elif test -f $file && test ! -f $curr_file
+    then
+        echo "$basefile - file deleted" >> $status_file
+    elif test -f $file && test ! -f $last_comm_file && 
+         ! diff "$curr_file" "$file" >/dev/null 2>&1
+    then
+        echo "$basefile - added to index, file changed" >> $status_file
+    elif test -f $file && test ! -f $last_comm_file
+    then
+        echo "$basefile - added to index" >> $status_file
+    # at this point, all files must exist
+    elif ! diff "$file" "$curr_file" >/dev/null 2>&1 &&
+         ! diff "$file" "$last_comm_file" >/dev/null 2>&1 &&
+         ! diff "$curr_file" "$last_comm_file" >/dev/null 2>&1
+    then
+        echo "$basefile - file changed, different changes staged for commit" >> $status_file
+    elif ! diff "$file" "$curr_file" >/dev/null 2>&1 &&
+           diff "$file" "$last_comm_file" >/dev/null 2>&1 
+    then
+        echo "$basefile - file changed, changes not staged for commit" >> $status_file
+    elif ! diff "$curr_file" "$last_comm_file" >/dev/null 2>&1 &&
+           diff "$file" "$curr_dir" >/dev/null 2>&1 
+    then
+        echo "$basefile - file changed, changes staged for commit" >> $status_file
+    elif diff "$file" "$curr_file" >/dev/null 2>&1 &&
+         diff "$file" "$last_comm_file" >/dev/null 2>&1 &&
+         diff "$curr_file" "$last_comm_file" >/dev/null 2>&1
+    then
+        echo "$basefile - same as repo" >> $status_file
+    fi
+
+    echo $basefile >> $status_visited
+    
+done
+
+# need to do a loop in the last_commit dir if the file doesnt exist in index
+# and maybe not in pwd
+for file in `find $last_commit_dir -type f`
+do
+    basefile=`basename $file`
+    curr_file="$curr_dir/$basefile"
+    index_file="$index/$basefile"
+    if ! grep $basefile $status_visited >/dev/null 2>&1
+    then
+        if test -f $file && test ! -f $curr_file && test ! -f $index_file
+        then
+            echo $basefile >> $status_visited
+            echo "$basefile - deleted" >> $status_file
+        fi
+    else
+        continue
+    fi
+done
+
+# need to do a loop in curr_dir if the file doesnt exist in index
+# and maybe not in last_comm
+for file in $curr_dir/*
+do
+    basefile=`basename $file`
+    last_comm_file="$last_commit_dir/$basefile"
+    index_file="$index/$basefile"
+    if ! grep $basefile $status_visited >/dev/null 2>&1
+    then
+        if test -f $file && test ! -f $index_file
+        then
+            echo $basefile >> $status_visited
+            echo "$basefile - untracked" >> $status_file
+        fi
+    else
+        continue
+    fi
+done
+
+cat $status_file | sort
+exit 0

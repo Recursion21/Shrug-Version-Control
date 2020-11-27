@@ -1,0 +1,102 @@
+#!/bin/dash
+
+# flag argument processing
+flag1=null
+flag2=null
+no_flags=0
+
+if test $1 = --force
+then 
+    no_flags=$((no_flags + 1))
+    flag1=--force
+    if test $2 = --cached
+    then
+        no_flags=$((no_flags + 1))
+        flag2=--cached
+    fi
+else
+    if test $1 = --cached
+    then
+        no_flags=$((no_flags + 1))
+        flag1=--cached
+    fi
+fi
+
+# shift out the arguments, so files start at $1
+count=$no_flags
+while test $count -gt 0 
+do
+    shift
+    count=$((count - 1))
+done
+
+
+curr_dir=`pwd`
+index="$curr_dir/.shrug/index"
+# get last commit number
+last_line=`tail -1 "$curr_dir/.shrug/log"`
+last_commit=`echo $last_line | head -c 1`
+last_commit_dir="$curr_dir/.shrug/.snapshot.$last_commit"
+
+# long chain of if for error echos depending on the situation
+# most should be self-explanatory from if statement
+# $1 contains file_arg, shift after each one is processed so next file is at $1
+if test $flag1 = --cached || test $flag2 = --cached
+then
+    while test ! -z $1
+    do
+        if ! test -f "$index/$1"
+        then
+            echo "shrug-rm: error: '$1' is not in the shrug repository"
+        elif ! diff "$last_commit_dir/$1" "$index/$1" >/dev/null 2>&1  &&
+             ! diff "$curr_dir/$1" "$index/$1" > /dev/null 2>&1
+        then
+            if ! test $flag1 = --force
+            then
+                echo "shrug-rm: error: '$1' in index is different to both working file and repository"
+            else
+                rm -- $index/$1 >/dev/null 2>&1
+            fi
+        else
+            rm -- $index/$1 >/dev/null 2>&1
+        fi
+        shift
+
+    done
+elif test $flag1 = --force
+then
+    while test ! -z $1
+    do
+        if ! rm -- $index/$1 2> /dev/null
+        then
+            echo "shrug-rm: error: '$1' is not in the shrug repository"
+        else
+            rm -- $curr_dir/$1 2> /dev/null
+        fi
+        shift
+    done
+else
+    while test ! -z $1
+    do
+        if ! test -f "$index/$1"
+        then
+            echo "shrug-rm: error: '$1' is not in the shrug repository"
+        elif ! diff "$last_commit_dir/$1" "$index/$1" >/dev/null 2>&1  &&
+             ! diff "$curr_dir/$1" "$index/$1" > /dev/null 2>&1
+        then
+            echo "shrug-rm: error: '$1' in index is different to both working file and repository"
+        elif ! diff "$last_commit_dir/$1" "$index/$1" >/dev/null 2>&1
+        then
+            echo "shrug-rm: error: '$1' has changes staged in the index"
+        elif ! diff "$curr_dir/$1" "$index/$1" >/dev/null 2>&1 
+        then
+            echo "shrug-rm: error: '$1' in repository is different to working file"
+        else
+            rm -- $index/$1 >/dev/null 2>&1
+            rm -- $curr_dir/$1 >/dev/null 2>&1
+        fi
+        shift
+    done
+fi
+
+exit 0

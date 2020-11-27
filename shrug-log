@@ -1,0 +1,4 @@
+#!/bin/dash
+
+curr_dir=`pwd`
+tac "$curr_dir/.shrug/log"
